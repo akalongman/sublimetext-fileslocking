@@ -2,10 +2,6 @@
 	// Don't make changes to this file directly as they can get wiped out when the
 	// plugin is updated. Instead transfer what you need to the 'Settings - User' file.
 
-	"fileslocking_user": "LONGMAN",
-
-
-	// Files larger than this many bytes won't be backed up.
-	"max_backup_file_size_bytes": 262144 // = 256 KB
+	"fileslocking_user": "Guest"
 
 }

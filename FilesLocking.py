@@ -10,6 +10,7 @@ import string
 import platform
 import socket
 import time
+import subprocess
 
 st_version = 2
 if sublime.version() == '' or int(sublime.version()) > 3000:
@@ -22,8 +23,9 @@ cprint = globals()["__builtins__"]["print"]
 
 
 def plugin_loaded():
-	global settings
+	global settings, platform
 	settings = sublime.load_settings('FilesLocking.sublime-settings')
+	platform = sublime.platform()
 	cprint('FilesLocking: Plugin Initialized')
 	windows = sublime.windows()
 	for window in windows:
@@ -102,12 +104,32 @@ class Locker(object):
 		text.append(lock_hostname)
 		text.append(lock_ip)
 		text = "\n".join(text)
-		f = open(lock_file_name, 'w')
-		f.write(text)
-		f.close()
+		try:
+			f = open(lock_file_name, 'w')
+			f.write(text)
+			f.close()
+		except Exception as e:
+			cprint(e)
+
+		#hide lock file
+		#Locker.hide_file(lock_file_name)
 
 		msg = 'Lock set to file '+filename
 		sublime.status_message(msg)
+
+
+	@staticmethod
+	def hide_file(lock_file_name):
+		try:
+			if (platform == "windows"):
+				startupinfo = subprocess.STARTUPINFO()
+				startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+				startupinfo.wShowWindow = subprocess.SW_HIDE
+				subprocess.call(['attrib', '+H', lock_file_name], startupinfo=startupinfo, shell=False)
+			else:
+				subprocess.call(['chflags', 'hidden', lock_file_name])
+		except Exception as e:
+			cprint(e)
 
 
 	@staticmethod
@@ -133,11 +155,14 @@ class Locker(object):
 		if (os.path.isfile(new_name)):
 			locktime = os.path.getmtime(new_name)
 			lock_user = settings.get('fileslocking_user', 'Guest');
+			lock_hostname = socket.gethostname()
+			lock_ip = socket.gethostbyname(lock_hostname)
 			try:
 				with open(new_name, 'rU') as f:
 					lockinfo = f.read().splitlines()
 					locker = lockinfo[0]
-					if locker == lock_user:
+					hostname = lockinfo[1]
+					if locker == lock_user and hostname == lock_hostname:
 						print("You opened a file that was locked by yourself.")
 					else:
 						# File is already locked, so don't let user open it.
