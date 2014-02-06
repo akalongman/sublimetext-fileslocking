@@ -185,7 +185,7 @@ class Locker(object):
 					lockinfo = f.read().splitlines()
 					locker = lockinfo[0]
 					hostname = lockinfo[1]
-					if locker == lock_user and hostname == lock_hostname and False:
+					if locker == lock_user and hostname == lock_hostname:
 						#print("You opened a file that was locked by yourself.")
 						Locker.force_close = True
 					else:
@@ -202,8 +202,8 @@ class Locker(object):
 							minago = lockdiff // 60
 							minstr = ' minutes'
 
-						readablemsg = (str(minago) + math.ceil(minstr)) + " ago"
-						error_msg = locker + " locked " + filename + " at " + time.strftime("%H:%M", time.localtime(locktime)) + " (about " + readablemsg + ")."
+						readablemsg = (str(math.ceil(minago)) + minstr) + " ago"
+						error_msg = locker + " locked " + filename + " at " + time.strftime("%H:%M", time.localtime(locktime)) + " (about a " + readablemsg + ")."
 						Locker.force_close = True
 						sublime.error_message(error_msg)
 						#view.window().run_command("close")
