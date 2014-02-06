@@ -11,6 +11,8 @@ import platform
 import socket
 import time
 import subprocess
+import math
+
 
 st_version = 2
 if sublime.version() == '' or int(sublime.version()) > 3000:
@@ -45,16 +47,30 @@ class FilesLockingEventListener(sublime_plugin.EventListener):
 		#cprint('CLOSE');
 		Locker.unlock_file(view)
 
-	def on_load(self, view):
+
+	def on_modified(self, view):
 		if (st_version == 3):
 			return
-		#cprint('OPEN');
+		on_modified_async(view)
+		#cprint('MODIFIED');
 
-	def on_load_async(self, view):
-		#cprint('OPEN');
-		Locker.check_lock(view);
+	def on_modified_async(self, view):
+		#cprint('MODIFIED');
+		locked = Locker.check_lock(view, False);
+		if (not locked):
+			Locker.lock_file(view);
 
-		Locker.lock_file(view);
+	def on_pre_save(self, view):
+		if (st_version == 3):
+			return
+		on_pre_save_async(view)
+		#cprint('SAVED');
+
+	def on_pre_save_async(self, view):
+		#cprint('SAVED');
+		locked = Locker.check_lock(view, True);
+		if (not locked):
+			Locker.lock_file(view);
 
 
 	def console(self, text):
@@ -79,6 +95,8 @@ class Locker(object):
 		gsettings = sublime.load_settings('Preferences.sublime-settings')
 		file_exclude_patterns = gsettings.get('file_exclude_patterns', '');
 		file_exclude_patterns.append('*.'+Locker.lock_ext)
+
+		file_exclude_patterns.append('*.py')
 
 		filename = view.file_name()
 		if (not filename):
@@ -116,7 +134,7 @@ class Locker(object):
 
 		msg = 'Lock set to file '+filename
 		sublime.status_message(msg)
-
+		cprint(msg)
 
 	@staticmethod
 	def hide_file(lock_file_name):
@@ -134,6 +152,7 @@ class Locker(object):
 
 	@staticmethod
 	def unlock_file(view):
+		cprint('FORCE CLOSE: '+str(Locker.force_close))
 		if (Locker.force_close):
 			Locker.force_close = False
 			return
@@ -146,10 +165,14 @@ class Locker(object):
 			os.remove(new_name)
 			msg = 'Lock removed to file '+filename
 			sublime.status_message(msg)
+			cprint(msg)
 
 	@staticmethod
-	def check_lock(view):
+	def check_lock(view, from_save = False):
 		filename = view.file_name()
+		if (not filename):
+			return
+
 		new_name = filename+'.'+Locker.lock_ext
 		locked = False
 		if (os.path.isfile(new_name)):
@@ -162,8 +185,9 @@ class Locker(object):
 					lockinfo = f.read().splitlines()
 					locker = lockinfo[0]
 					hostname = lockinfo[1]
-					if locker == lock_user and hostname == lock_hostname:
-						print("You opened a file that was locked by yourself.")
+					if locker == lock_user and hostname == lock_hostname and False:
+						#print("You opened a file that was locked by yourself.")
+						Locker.force_close = True
 					else:
 						# File is already locked, so don't let user open it.
 						f.close()
@@ -178,13 +202,13 @@ class Locker(object):
 							minago = lockdiff // 60
 							minstr = ' minutes'
 
-						readablemsg = (str(minago) + minstr) + " ago"
-
+						readablemsg = (str(minago) + math.ceil(minstr)) + " ago"
 						error_msg = locker + " locked " + filename + " at " + time.strftime("%H:%M", time.localtime(locktime)) + " (about " + readablemsg + ")."
-						sublime.error_message(error_msg)
 						Locker.force_close = True
-						view.window().run_command("close")
+						sublime.error_message(error_msg)
+						#view.window().run_command("close")
+						locked = True
 			except Exception as e:
 						cprint(e)
-
+		return locked
 
